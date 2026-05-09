@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>On-Device Internals</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Highlight.js for Syntax Highlighting (Canvas Feature) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #202124;
+            --text-color: #e8eaed;
+            --panel-bg: #292a2d;
+            --border-color: #3c4043;
+            --btn-bg: #303134;
+            --btn-hover: #424548;
+            --btn-active: #8ab4f8;
+            --user-msg-bg: #e8eaed;
+            --user-msg-text: #202124;
+            --ai-msg-bg: #8ab4f8;
+            --ai-msg-text: #202124;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+
+        /* --- TABS SYSTEM --- */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text-color);
+            text-align: center;
+            border-radius: 0;
+            box-shadow: none;
+            font-size: 14px;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-btn.active {
+            border-bottom: 2px solid var(--btn-active);
+            color: var(--btn-active);
+        }
+
+        .tab-btn:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        /* ------------------- */
+
+        .accordion {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        summary {
+            padding: 15px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            outline: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .accordion-icon {
+            display: inline-block;
+            transition: transform 0.3s ease;
+            font-size: 12px;
+            color: var(--btn-active);
+        }
+
+        details[open] .accordion-icon {
+            transform: rotate(180deg);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: flex-end;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+        }
+
+        .control-group label {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .tooltip-icon {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: var(--border-color);
+            color: var(--text-color);
+            text-align: center;
+            font-size: 10px;
+            line-height: 14px;
+            cursor: help;
+            position: relative;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: #000;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 11px;
+            font-weight: normal;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .tooltip-icon:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        select, input[type="number"] {
+            background-color: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px;
+            border-radius: 4px;
+            outline: none;
+            width: 120px;
+        }
+
+        .input-section { margin-bottom: 20px; }
+        .input-section label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            background-color: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 10px;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+            font-family: inherit;
+            outline: none;
+        }
+
+        #contextInput {
+            height: 80px;
+            margin-top: 10px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: var(--btn-bg);
+            color: var(--btn-active);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover { background-color: var(--btn-hover); }
+        .btn-primary {
+            background-color: var(--border-color);
+            color: var(--text-color);
+        }
+        .btn-danger {
+            background-color: transparent;
+            color: #f28b82;
+            border-color: #f28b82;
+            font-weight: bold;
+        }
+        .btn-danger:hover { background-color: rgba(242, 139, 130, 0.1); }
+
+        #conversationContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message-pair {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-left: 2px solid var(--border-color);
+            padding-left: 15px;
+            margin-bottom: 10px;
+        }
+
+        .bubble {
+            padding: 15px;
+            border-radius: 12px;
+            max-width: 80%;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .bubble-user {
+            background-color: var(--user-msg-bg);
+            color: var(--user-msg-text);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            max-height: 135px; /* Exactement ~5 lignes (5 * 21px) + padding */
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .bubble-ai {
+            background-color: var(--ai-msg-bg);
+            color: var(--ai-msg-text);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            width: 100%;
+        }
+
+        /* --- Code Canvas Styling --- */
+        .bubble-ai pre {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 10px 0;
+            padding: 0;
+        }
+        .canvas-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #2d2d2d;
+            padding: 5px 15px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 12px;
+            color: #9aa0a6;
+            border-bottom: 1px solid #444;
+        }
+        .bubble-ai pre code {
+            display: block;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+        }
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #555;
+            color: #aaa;
+            border-radius: 4px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover {
+            background: #444;
+            color: #fff;
+        }
+
+        #fileInfo {
+            font-size: 12px;
+            color: var(--btn-active);
+            margin-left: 10px;
+            align-self: center;
+        }
+
+        /* --- LOGS STYLES --- */
+        .console-box {
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 250px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: Consolas, Monaco, 'Andale Mono', monospace;
+            font-size: 13px;
+            border: 1px solid var(--border-color);
+        }
+        .log-entry { margin-bottom: 8px; border-bottom: 1px dashed #333; padding-bottom: 4px; }
+        .log-time { color: #5eead4; margin-right: 10px; }
+        .log-msg { color: #d1d5db; }
+        .log-error { color: #fca5a5; }
+        .log-success { color: #81c995; }
+
+        .dummy-content {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            color: #9aa0a6;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>On-Device Internals</h1>
+
+    <!-- TABS HEADER -->
+    <div class="tabs">
+        <button class="tab-btn active" data-target="tab-tools">Tools</button>
+        <button class="tab-btn" data-target="tab-logs">Event Logs</button>
+        <button class="tab-btn" data-target="tab-status">Model Status</button>
+    </div>
+
+    <!-- TAB 1 : TOOLS -->
+    <div id="tab-tools" class="tab-content active">
+
+        <details class="accordion">
+            <summary>Context options (current size: <span id="contextWordCount">0</span> words) <span class="accordion-icon">▼</span></summary>
+            <div style="padding: 15px; font-size: 13px;">
+                <label style="color: #9aa0a6; margin-bottom: 5px; display: block;">System Prompt / Context definition:</label>
+                <textarea id="contextInput" placeholder="Define critical instructions here... (e.g., 'You are a pirate')"></textarea>
+            </div>
+        </details>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Language</label>
+                <!-- Les valeurs sont limitées pour satisfaire Chrome 150 -->
+                <select id="languageSelect">
+                    <option value="en">English (en-US)</option>
+                    <option value="fr">Français (fr-FR)</option>
+                    <option value="es">Español (es-ES)</option>
+                    <option value="ja">Japanese (ja-JP)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Top K
+                    <span class="tooltip-icon">?
+                            <span class="tooltip-text">Defines the number of probable tokens. Lower value makes output more deterministic.</span>
+                        </span>
+                </label>
+                <input type="number" id="topK" value="3" min="1" max="40">
+            </div>
+            <div class="control-group">
+                <label>Temperature
+                    <span class="tooltip-icon">?
+                            <span class="tooltip-text">Controls creativity. 0 = strict/deterministic, 1 = highly creative. Default: 0.8.</span>
+                        </span>
+                </label>
+                <input type="number" id="temperature" value="0.8" step="0.1" min="0" max="2">
+            </div>
+            <div class="control-group">
+                <label>Features</label>
+                <label style="cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 5px; height: 33px; padding-bottom: 3px;">
+                    <input type="checkbox" id="enableCanvas" checked>
+                    Markdown & Code Canvas
+                </label>
+            </div>
+        </div>
+
+        <div class="input-section">
+            <label>Input</label>
+            <textarea id="promptInput" placeholder="Ask a question, provide instructions, or describe the attached image..."></textarea>
+        </div>
+
+        <div class="buttons">
+            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            <button class="btn" onclick="document.getElementById('imageInput').click()">+ Add image</button>
+            <button class="btn">+ Add audio</button>
+            <span id="fileInfo"></span>
+        </div>
+
+        <div class="buttons">
+            <button class="btn btn-primary" id="executeBtn">Execute</button>
+            <button class="btn btn-danger" id="cancelBtn" style="display: none;">Stop (Force Kill)</button>
+            <button class="btn" onclick="clearUI();">Clear Input</button>
+        </div>
+
+        <div id="conversationContainer">
+            <!-- Les nouvelles conversations viendront s'empiler ici -->
+        </div>
+    </div>
+
+    <!-- TAB 2 : EVENT LOGS -->
+    <div id="tab-logs" class="tab-content">
+        <div class="console-box" id="eventLogs"></div>
+    </div>
+
+    <!-- TAB 3 : MODEL STATUS -->
+    <div id="tab-status" class="tab-content">
+        <div class="dummy-content" id="modelStatusBox">
+            <p><strong>Checking Model Status...</strong></p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- TABS LOGIC ---
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabBtns.forEach(t => t.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.getAttribute('data-target')).classList.add('active');
+        });
+    });
+
+    // --- DOM Elements ---
+    const executeBtn = document.getElementById('executeBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const promptInput = document.getElementById('promptInput');
+    const contextInput = document.getElementById('contextInput');
+    const contextWordCount = document.getElementById('contextWordCount');
+    const topKInput = document.getElementById('topK');
+    const temperatureInput = document.getElementById('temperature');
+    const languageSelect = document.getElementById('languageSelect');
+    const enableCanvas = document.getElementById('enableCanvas');
+    const conversationContainer = document.getElementById('conversationContainer');
+    const imageInput = document.getElementById('imageInput');
+    const fileInfo = document.getElementById('fileInfo');
+
+    let currentFile = null;
+    let aiSession = null;
+    let abortController = null;
+
+    // --- LOGS ---
+    const logsContainer = document.getElementById('eventLogs');
+    function addLog(msg, type = 'info') {
+        const now = new Date();
+        const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : 'log-msg'}`;
+        entry.innerHTML = `<span class="log-time">[${timeStr}]</span> ${msg}`;
+        logsContainer.appendChild(entry);
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    // --- ULTRA ROBUST API DETECTION (CHROME 148-150+) ---
+    function getAiApi() {
+        try {
+            if (window.ai && window.ai.languageModel) return window.ai.languageModel;
+            if (typeof LanguageModel !== 'undefined') return LanguageModel;
+            if (window.ai && window.ai.assistant) return window.ai.assistant;
+            if (window.ai) return window.ai; // Fallback pour certaines versions canary
+        } catch (e) {
+            addLog("API Discovery Error: " + e.message, "error");
+        }
+        return null;
+    }
+
+    // --- STATUS CHECK ---
+    async function initModelStatus() {
+        const statusBox = document.getElementById('modelStatusBox');
+        addLog("Initializing Model Status check...");
+        const aiApi = getAiApi();
+
+        if (!aiApi) {
+            const errorMsg = "LanguageModel API not found. Please check chrome://flags.";
+            addLog(errorMsg, "error");
+            statusBox.innerHTML = `<p style="color: #fca5a5;"><strong>Error:</strong> ${errorMsg}</p>`;
+            return;
+        }
+
+        try {
+            // On force "en" pour satisfaire la contrainte [en, es, ja] de Chrome 150
+            const status = await aiApi.availability({ outputLanguage: "en" });
+            addLog(`Model availability status: ${status}`, "success");
+            statusBox.innerHTML = `
+                    <p><strong>Model Status:</strong> <span style="color: #5eead4;">${status}</span></p>
+                    <p><strong>API Type:</strong> ${aiApi === window.ai ? 'window.ai' : 'LanguageModel'}</p>
+                    <p><strong>Hardware:</strong> On-Device WebGPU / WASM</p>
+                `;
+        } catch(e) {
+            addLog(`Availability check failed: ${e.message}`, "error");
+            statusBox.innerHTML = `<p style="color: #fca5a5;"><strong>Error:</strong> ${e.message}</p>`;
+        }
+    }
+    initModelStatus();
+
+    // --- UI Interactions ---
+    contextInput.addEventListener('input', () => {
+        const text = contextInput.value.trim();
+        contextWordCount.textContent = text ? text.split(/\s+/).length : 0;
+    });
+
+    imageInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            currentFile = e.target.files[0];
+            fileInfo.textContent = `Attached: ${currentFile.name}`;
+            addLog(`File attached: ${currentFile.name} (${Math.round(currentFile.size/1024)} KB)`);
+        }
+    });
+
+    function clearUI() {
+        promptInput.value = '';
+        if (currentFile) addLog(`File removed: ${currentFile.name}`);
+        currentFile = null;
+        imageInput.value = '';
+        fileInfo.textContent = '';
+    }
+
+    // --- EXECUTION CORE ---
+    executeBtn.addEventListener('click', async () => {
+        const rawText = promptInput.value.trim();
+        const systemContext = contextInput.value.trim();
+
+        if (!rawText && !currentFile) return;
+
+        const aiApi = getAiApi();
+        if (!aiApi) {
+            alert("The local AI API is not detected on this browser.");
+            return;
+        }
+
+        // UI States & Stop Button Init
+        executeBtn.disabled = true;
+        executeBtn.textContent = 'Executing...';
+        cancelBtn.style.display = 'flex';
+
+        abortController = new AbortController();
+
+        cancelBtn.onclick = () => {
+            if (abortController) {
+                abortController.abort();
+                addLog("Process interrupted by user (Force Kill).", "error");
+            }
+        };
+
+        try {
+            // UI - Building Bubbles
+            const pairContainer = document.createElement('div');
+            pairContainer.className = 'message-pair';
+
+            const aiBubble = document.createElement('div');
+            aiBubble.className = 'bubble bubble-ai';
+            aiBubble.innerHTML = '<em>Thinking...</em>';
+
+            const userBubble = document.createElement('div');
+            userBubble.className = 'bubble bubble-user';
+
+            let userDisplayText = rawText || "[Image Only]";
+            if (currentFile) userDisplayText += ` (Image: ${currentFile.name})`;
+            if (systemContext) {
+                userDisplayText += `\n\n<span style="color: #81c995; font-size: 11px;">✓ Context applied: "${systemContext}"</span>`;
+            }
+            userBubble.innerHTML = userDisplayText;
+
+            pairContainer.appendChild(userBubble);
+            pairContainer.appendChild(aiBubble);
+            conversationContainer.prepend(pairContainer);
+
+            addLog("Execution started. Building session...");
+
+            if (aiSession) {
+                aiSession.destroy();
+                addLog("Previous session destroyed to free VRAM.");
+            }
+
+            // API Options
+            let apiLanguage = languageSelect.value;
+            // Triche pour Chrome 150 : Si Français choisi, on déclare "Anglais" à l'API pour éviter le crash
+            if (apiLanguage === 'fr') {
+                apiLanguage = 'en';
+            }
+
+            let options = {
+                temperature: parseFloat(temperatureInput.value),
+                topK: parseInt(topKInput.value),
+                signal: abortController.signal,
+                outputLanguage: apiLanguage
+            };
+
+            if (currentFile) {
+                options.expectedInputs = [{ type: 'text' }, { type: 'image' }];
+            }
+
+            addLog(`Creating session (Lang forced to: ${apiLanguage}, Temp: ${options.temperature})...`);
+            aiSession = await aiApi.create(options);
+
+            // --- LE HACK DU MARTEAU (PROMPT ENGINEERING) ---
+            const uiLanguageName = languageSelect.options[languageSelect.selectedIndex].text.split(' ')[0];
+            let textWithSystemInstruction = rawText;
+
+            // On force le contexte au début
+            if (systemContext) {
+                textWithSystemInstruction = `[CRITICAL INSTRUCTION: ${systemContext}]\n\n` + textWithSystemInstruction;
+                addLog("Critical Context injected into prompt.");
+            }
+
+            // On force la langue à la fin (Très important pour le Français)
+            textWithSystemInstruction += `\n\n[Instruction for model: You must reply entirely in ${uiLanguageName}]`;
+
+            let promptPayload;
+            if (currentFile) {
+                promptPayload = [{
+                    role: 'user',
+                    content: [
+                        { type: 'text', value: textWithSystemInstruction },
+                        { type: 'image', value: currentFile }
+                    ]
+                }];
+                addLog("Sending multimodal payload...");
+            } else {
+                promptPayload = textWithSystemInstruction;
+                addLog("Sending text-only payload...");
+            }
+
+            // Execution Streaming
+            const stream = await aiSession.promptStreaming(promptPayload, { signal: abortController.signal });
+            let fullResponse = '';
+            aiBubble.innerHTML = '';
+
+            for await (const chunk of stream) {
+                fullResponse += chunk;
+
+                if (enableCanvas.checked) {
+                    aiBubble.innerHTML = marked.parse(fullResponse);
+
+                    // Canvas & Highlight.js
+                    aiBubble.querySelectorAll('pre').forEach((pre) => {
+                        const codeBlock = pre.querySelector('code');
+                        if (codeBlock && !pre.querySelector('.canvas-header')) {
+                            hljs.highlightElement(codeBlock);
+                            const langClass = Array.from(codeBlock.classList).find(c => c.startsWith('language-'));
+                            const langName = langClass ? langClass.replace('language-', '') : 'text';
+
+                            const header = document.createElement('div');
+                            header.className = 'canvas-header';
+                            header.innerHTML = `
+                                    <span style="text-transform: uppercase; letter-spacing: 0.5px;">${langName}</span>
+                                    <button class="copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText); this.textContent='Copied!'; setTimeout(() => this.textContent='Copy', 2000);">Copy</button>
+                                `;
+                            pre.insertBefore(header, codeBlock);
+                        }
+                    });
+                } else {
+                    aiBubble.textContent = fullResponse;
+                }
+            }
+
+            addLog("Execution completed successfully.", "success");
+
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                if (conversationContainer.firstChild) {
+                    const aiBubble = conversationContainer.firstChild.querySelector('.bubble-ai');
+                    if (aiBubble) aiBubble.innerHTML += `<br><br><em style="color: #fca5a5;">[Generation stopped by user]</em>`;
+                }
+            } else {
+                console.error("Execution error:", error);
+                addLog(`Execution failed: ${error.message}`, "error");
+                if (conversationContainer.firstChild) {
+                    const aiBubble = conversationContainer.firstChild.querySelector('.bubble-ai');
+                    if (aiBubble) aiBubble.innerHTML = `<strong>API Error:</strong> ${error.message}`;
+                }
+            }
+        } finally {
+            executeBtn.disabled = false;
+            executeBtn.textContent = 'Execute';
+            cancelBtn.style.display = 'none'; // Cache le bouton Stop
+            abortController = null;
+        }
+    });
+</script>
+</body>
+</html>
