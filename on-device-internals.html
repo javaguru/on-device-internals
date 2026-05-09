@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="author" content="Copyright (c) 2001-2026 JServlet.com Franck ANDRIANO." />
+    <meta name="application-name" content="On-Device Internals" lang="en" />
     <title>On-Device Internals</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
@@ -77,10 +79,15 @@
             background-color: rgba(255, 255, 255, 0.05);
         }
 
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        /* ------------------- */
+        .tab-content {
+            display: none;
+        }
 
+        .tab-content.active {
+            display: block;
+        }
+
+        /* --- UI COMPONENTS --- */
         .accordion {
             background-color: var(--panel-bg);
             border: 1px solid var(--border-color);
@@ -115,7 +122,7 @@
             display: flex;
             gap: 20px;
             margin-bottom: 20px;
-            align-items: flex-end;
+            align-items: flex-start;
         }
 
         .control-group {
@@ -130,6 +137,22 @@
             display: flex;
             align-items: center;
             gap: 5px;
+        }
+
+        .checkbox-label {
+            cursor: pointer;
+            font-size: 13px !important;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            height: 20px;
+        }
+
+        .features-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 25px;
         }
 
         .tooltip-icon {
@@ -155,7 +178,7 @@
             border-radius: 6px;
             padding: 5px 10px;
             position: absolute;
-            z-index: 1;
+            z-index: 10;
             bottom: 125%;
             left: 50%;
             margin-left: -100px;
@@ -182,11 +205,7 @@
         }
 
         .input-section { margin-bottom: 20px; }
-        .input-section label {
-            display: block;
-            font-size: 12px;
-            margin-bottom: 8px;
-        }
+        .input-section label { display: block; font-size: 12px; margin-bottom: 8px; }
 
         textarea {
             width: 100%;
@@ -228,18 +247,11 @@
         }
 
         .btn:hover { background-color: var(--btn-hover); }
-        .btn-primary {
-            background-color: var(--border-color);
-            color: var(--text-color);
-        }
-        .btn-danger {
-            background-color: transparent;
-            color: #f28b82;
-            border-color: #f28b82;
-            font-weight: bold;
-        }
+        .btn-primary { background-color: var(--border-color); color: var(--text-color); }
+        .btn-danger { background-color: transparent; color: #f28b82; border-color: #f28b82; }
         .btn-danger:hover { background-color: rgba(242, 139, 130, 0.1); }
 
+        /* --- CHAT BUBBLES --- */
         #conversationContainer {
             display: flex;
             flex-direction: column;
@@ -269,7 +281,7 @@
             color: var(--user-msg-text);
             align-self: flex-start;
             border-bottom-left-radius: 4px;
-            max-height: 135px; /* Exactement ~5 lignes (5 * 21px) + padding */
+            max-height: 135px;
             overflow-y: auto;
             white-space: pre-wrap;
         }
@@ -280,6 +292,30 @@
             align-self: flex-start;
             border-bottom-left-radius: 4px;
             width: 100%;
+            position: relative; /* Needed for TTS button positioning */
+        }
+
+        /* --- TEXT-TO-SPEECH BUTTON --- */
+        .tts-btn {
+            position: absolute;
+            bottom: 10px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            opacity: 0.6;
+            transition: all 0.2s ease;
+            padding: 5px;
+            border-radius: 50%;
+        }
+        .tts-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        .tts-btn.playing {
+            opacity: 1;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));
         }
 
         /* --- Code Canvas Styling --- */
@@ -319,17 +355,9 @@
             font-size: 11px;
             transition: all 0.2s;
         }
-        .copy-btn:hover {
-            background: #444;
-            color: #fff;
-        }
+        .copy-btn:hover { background: #444; color: #fff; }
 
-        #fileInfo {
-            font-size: 12px;
-            color: var(--btn-active);
-            margin-left: 10px;
-            align-self: center;
-        }
+        #fileInfo { font-size: 12px; color: var(--btn-active); margin-left: 10px; align-self: center; }
 
         /* --- LOGS STYLES --- */
         .console-box {
@@ -347,7 +375,6 @@
         .log-time { color: #5eead4; margin-right: 10px; }
         .log-msg { color: #d1d5db; }
         .log-error { color: #fca5a5; }
-        .log-success { color: #81c995; }
 
         .dummy-content {
             background: var(--panel-bg);
@@ -363,18 +390,21 @@
 <div class="container">
     <h1>On-Device Internals</h1>
 
-    <!-- TABS HEADER -->
+    <!-- HEADER DES ONGLETS -->
     <div class="tabs">
         <button class="tab-btn active" data-target="tab-tools">Tools</button>
         <button class="tab-btn" data-target="tab-logs">Event Logs</button>
         <button class="tab-btn" data-target="tab-status">Model Status</button>
     </div>
 
-    <!-- TAB 1 : TOOLS -->
+    <!-- CONTENU ONGLET 1 : TOOLS -->
     <div id="tab-tools" class="tab-content active">
 
         <details class="accordion">
-            <summary>Context options (current size: <span id="contextWordCount">0</span> words) <span class="accordion-icon">▼</span></summary>
+            <summary>
+                <span>Context options (current size: <span id="contextWordCount">0</span> words)</span>
+                <span class="accordion-icon">▼</span>
+            </summary>
             <div style="padding: 15px; font-size: 13px;">
                 <label style="color: #9aa0a6; margin-bottom: 5px; display: block;">System Prompt / Context definition:</label>
                 <textarea id="contextInput" placeholder="Define critical instructions here... (e.g., 'You are a pirate')"></textarea>
@@ -384,18 +414,28 @@
         <div class="controls">
             <div class="control-group">
                 <label>Language</label>
-                <!-- Les valeurs sont limitées pour satisfaire Chrome 150 -->
                 <select id="languageSelect">
-                    <option value="en">English (en-US)</option>
-                    <option value="fr">Français (fr-FR)</option>
-                    <option value="es">Español (es-ES)</option>
-                    <option value="ja">Japanese (ja-JP)</option>
+                    <!-- Langues classiques -->
+                    <option value="en-US">English (en-US)</option>
+                    <option value="fr-FR">Français (fr-FR)</option>
+                    <option value="es-ES">Español (es-ES)</option>
+                    <option value="ja-JP">日本語 (ja-JP)</option>
+                    <option value="de-DE">Deutsch (de-DE)</option>
+                    <option value="it-IT">Italiano (it-IT)</option>
+                    <!-- Nouvelles langues ajoutées -->
+                    <option value="ko-KR">한국어 (ko-KR)</option>
+                    <option value="pt-BR">Português (pt-BR)</option>
+                    <option value="ru-RU">Русский (ru-RU)</option>
+                    <option value="ar-SA">العربية (ar-SA)</option>
+                    <option value="hi-IN">हिन्दी (hi-IN)</option>
+                    <option value="zh-CN">简体中文 (zh-CN)</option>
+                    <option value="zh-TW">繁體中文 (zh-TW)</option>
                 </select>
             </div>
             <div class="control-group">
                 <label>Top K
                     <span class="tooltip-icon">?
-                            <span class="tooltip-text">Defines the number of probable tokens. Lower value makes output more deterministic.</span>
+                            <span class="tooltip-text">Defines the number of probable tokens the model chooses from. Lower value makes output more deterministic.</span>
                         </span>
                 </label>
                 <input type="number" id="topK" value="3" min="1" max="40">
@@ -408,30 +448,37 @@
                 </label>
                 <input type="number" id="temperature" value="0.8" step="0.1" min="0" max="2">
             </div>
+
             <div class="control-group">
                 <label>Features</label>
-                <label style="cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 5px; height: 33px; padding-bottom: 3px;">
-                    <input type="checkbox" id="enableCanvas" checked>
-                    Markdown & Code Canvas
-                </label>
+                <div class="features-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableCanvas" checked>
+                        Markdown & Code Canvas
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoReadVoice">
+                        Auto-Read Voice
+                    </label>
+                </div>
             </div>
         </div>
 
         <div class="input-section">
             <label>Input</label>
-            <textarea id="promptInput" placeholder="Ask a question, provide instructions, or describe the attached image..."></textarea>
+            <textarea id="promptInput" placeholder="Ask a question, provide instructions, or describe the attached media..."></textarea>
         </div>
 
         <div class="buttons">
-            <input type="file" id="imageInput" accept="image/*" style="display: none;">
-            <button class="btn" onclick="document.getElementById('imageInput').click()">+ Add image</button>
-            <button class="btn">+ Add audio</button>
+            <input type="file" id="imageInput" accept="image/*, audio/*" style="display: none;">
+            <button class="btn" onclick="document.getElementById('imageInput').accept='image/*'; document.getElementById('imageInput').click()">+ Add image</button>
+            <button class="btn" onclick="document.getElementById('imageInput').accept='audio/*'; document.getElementById('imageInput').click()">+ Add audio</button>
             <span id="fileInfo"></span>
         </div>
 
         <div class="buttons">
             <button class="btn btn-primary" id="executeBtn">Execute</button>
-            <button class="btn btn-danger" id="cancelBtn" style="display: none;">Stop (Force Kill)</button>
+            <button class="btn btn-danger" id="cancelBtn" style="display: none;">Stop</button>
             <button class="btn" onclick="clearUI();">Clear Input</button>
         </div>
 
@@ -440,12 +487,14 @@
         </div>
     </div>
 
-    <!-- TAB 2 : EVENT LOGS -->
+    <!-- CONTENU ONGLET 2 : EVENT LOGS -->
     <div id="tab-logs" class="tab-content">
-        <div class="console-box" id="eventLogs"></div>
+        <div class="console-box" id="eventLogs">
+            <!-- Les logs dynamiques s'afficheront ici -->
+        </div>
     </div>
 
-    <!-- TAB 3 : MODEL STATUS -->
+    <!-- CONTENU ONGLET 3 : MODEL STATUS -->
     <div id="tab-status" class="tab-content">
         <div class="dummy-content" id="modelStatusBox">
             <p><strong>Checking Model Status...</strong></p>
@@ -455,7 +504,7 @@
 </div>
 
 <script>
-    // --- TABS LOGIC ---
+    // --- GESTION COMPLÈTE DES ONGLETS (TABS) ---
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
 
@@ -463,12 +512,13 @@
         btn.addEventListener('click', () => {
             tabBtns.forEach(t => t.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
+
             btn.classList.add('active');
-            document.getElementById(btn.getAttribute('data-target')).classList.add('active');
+            const targetId = btn.getAttribute('data-target');
+            document.getElementById(targetId).classList.add('active');
         });
     });
 
-    // --- DOM Elements ---
     const executeBtn = document.getElementById('executeBtn');
     const cancelBtn = document.getElementById('cancelBtn');
     const promptInput = document.getElementById('promptInput');
@@ -478,79 +528,108 @@
     const temperatureInput = document.getElementById('temperature');
     const languageSelect = document.getElementById('languageSelect');
     const enableCanvas = document.getElementById('enableCanvas');
+    const autoReadVoice = document.getElementById('autoReadVoice');
     const conversationContainer = document.getElementById('conversationContainer');
     const imageInput = document.getElementById('imageInput');
     const fileInfo = document.getElementById('fileInfo');
 
     let currentFile = null;
+    let attachmentType = null;
     let aiSession = null;
     let abortController = null;
 
-    // --- LOGS ---
+    // --- GESTION DES RACCOURCIS CLAVIER ---
+    promptInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            // Si Shift, Ctrl, ou Meta (Mac) sont pressés
+            if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                // Pour Ctrl+Enter et Meta+Enter, on force manuellement le saut de ligne
+                // (Car le comportement natif ne fait parfois rien)
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    const start = this.selectionStart;
+                    const end = this.selectionEnd;
+                    this.value = this.value.substring(0, start) + "\n" + this.value.substring(end);
+                    // On replace le curseur juste après le saut de ligne
+                    this.selectionStart = this.selectionEnd = start + 1;
+                }
+                // On ne fait rien d'autre (surtout pas de soumission)
+                return;
+            }
+
+            // Si ENTER est pressé seul (sans Shift, sans Ctrl)
+            e.preventDefault(); // Empêche le saut de ligne natif
+            if (!executeBtn.disabled) {
+                executeBtn.click();
+            }
+        }
+    });
+
+    // --- GESTION DES LOGS ---
     const logsContainer = document.getElementById('eventLogs');
-    function addLog(msg, type = 'info') {
+    function addLog(msg, isError = false) {
         const now = new Date();
         const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
         const entry = document.createElement('div');
-        entry.className = `log-entry ${type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : 'log-msg'}`;
-        entry.innerHTML = `<span class="log-time">[${timeStr}]</span> ${msg}`;
+        entry.className = 'log-entry';
+        entry.innerHTML = `<span class="log-time">[${timeStr}]</span> <span class="${isError ? 'log-error' : 'log-msg'}">${msg}</span>`;
         logsContainer.appendChild(entry);
         logsContainer.scrollTop = logsContainer.scrollHeight;
     }
 
-    // --- ULTRA ROBUST API DETECTION (CHROME 148-150+) ---
+    // Récupère l'API de manière sécurisée
     function getAiApi() {
         try {
-            if (window.ai && window.ai.languageModel) return window.ai.languageModel;
             if (typeof LanguageModel !== 'undefined') return LanguageModel;
-            if (window.ai && window.ai.assistant) return window.ai.assistant;
-            if (window.ai) return window.ai; // Fallback pour certaines versions canary
+            if (window.ai && window.ai.languageModel) return window.ai.languageModel;
         } catch (e) {
-            addLog("API Discovery Error: " + e.message, "error");
+            console.warn("API not found:", e);
         }
         return null;
     }
 
-    // --- STATUS CHECK ---
+    // Initialisation et Status
     async function initModelStatus() {
         const statusBox = document.getElementById('modelStatusBox');
         addLog("Initializing Model Status check...");
         const aiApi = getAiApi();
 
         if (!aiApi) {
-            const errorMsg = "LanguageModel API not found. Please check chrome://flags.";
-            addLog(errorMsg, "error");
+            const errorMsg = "LanguageModel API not found. Please check Chrome flags.";
+            addLog(errorMsg, true);
             statusBox.innerHTML = `<p style="color: #fca5a5;"><strong>Error:</strong> ${errorMsg}</p>`;
             return;
         }
 
         try {
-            // On force "en" pour satisfaire la contrainte [en, es, ja] de Chrome 150
-            const status = await aiApi.availability({ outputLanguage: "en" });
-            addLog(`Model availability status: ${status}`, "success");
+            const status = await aiApi.availability({ outputLanguage: "en-US" });
+            addLog(`Model availability status: ${status}`);
             statusBox.innerHTML = `
                     <p><strong>Model Status:</strong> <span style="color: #5eead4;">${status}</span></p>
-                    <p><strong>API Type:</strong> ${aiApi === window.ai ? 'window.ai' : 'LanguageModel'}</p>
+                    <p><strong>API:</strong> window.ai.languageModel</p>
                     <p><strong>Hardware:</strong> On-Device WebGPU / WASM</p>
                 `;
         } catch(e) {
-            addLog(`Availability check failed: ${e.message}`, "error");
+            addLog(`Error checking availability: ${e.message}`, true);
             statusBox.innerHTML = `<p style="color: #fca5a5;"><strong>Error:</strong> ${e.message}</p>`;
         }
     }
     initModelStatus();
 
-    // --- UI Interactions ---
+    // Gestion du contexte et comptage de mots
     contextInput.addEventListener('input', () => {
         const text = contextInput.value.trim();
-        contextWordCount.textContent = text ? text.split(/\s+/).length : 0;
+        const words = text ? text.split(/\s+/).length : 0;
+        contextWordCount.textContent = words;
     });
 
+    // Gestion du fichier joint (Image ou Audio)
     imageInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
             currentFile = e.target.files[0];
+            attachmentType = currentFile.type.startsWith('audio') ? 'audio' : 'image';
             fileInfo.textContent = `Attached: ${currentFile.name}`;
-            addLog(`File attached: ${currentFile.name} (${Math.round(currentFile.size/1024)} KB)`);
+            addLog(`File attached: ${currentFile.name} (${Math.round(currentFile.size/1024)} KB) - Type: ${attachmentType}`);
         }
     });
 
@@ -558,11 +637,33 @@
         promptInput.value = '';
         if (currentFile) addLog(`File removed: ${currentFile.name}`);
         currentFile = null;
+        attachmentType = null;
         imageInput.value = '';
         fileInfo.textContent = '';
+
+        if (window.speechSynthesis && window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+        }
     }
 
-    // --- EXECUTION CORE ---
+    // --- GESTION DU BOUTON CANCEL ---
+    cancelBtn.addEventListener('click', () => {
+        if (abortController) {
+            addLog("Sending Abort signal to stop generation...", true);
+            abortController.abort();
+        }
+        if (aiSession) {
+            try {
+                aiSession.destroy();
+                addLog("Session destroyed forcefully to stop generation.");
+            } catch(e) {}
+        }
+
+        if (window.speechSynthesis && window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+        }
+    });
+
     executeBtn.addEventListener('click', async () => {
         const rawText = promptInput.value.trim();
         const systemContext = contextInput.value.trim();
@@ -575,38 +676,30 @@
             return;
         }
 
-        // UI States & Stop Button Init
         executeBtn.disabled = true;
         executeBtn.textContent = 'Executing...';
         cancelBtn.style.display = 'flex';
 
         abortController = new AbortController();
 
-        cancelBtn.onclick = () => {
-            if (abortController) {
-                abortController.abort();
-                addLog("Process interrupted by user (Force Kill).", "error");
-            }
-        };
-
         try {
-            // UI - Building Bubbles
             const pairContainer = document.createElement('div');
             pairContainer.className = 'message-pair';
+
+            const userBubble = document.createElement('div');
+            userBubble.className = 'bubble bubble-user';
+            userBubble.textContent = rawText || "[Media Only]";
+            if (currentFile) {
+                userBubble.textContent += ` (Attached: ${currentFile.name})`;
+            }
+
+            if (systemContext) {
+                userBubble.innerHTML += `<br><span style="font-size: 11px; color: var(--btn-active); margin-top: 5px; display: block;">✓ Context applied (${contextWordCount.textContent} words)</span>`;
+            }
 
             const aiBubble = document.createElement('div');
             aiBubble.className = 'bubble bubble-ai';
             aiBubble.innerHTML = '<em>Thinking...</em>';
-
-            const userBubble = document.createElement('div');
-            userBubble.className = 'bubble bubble-user';
-
-            let userDisplayText = rawText || "[Image Only]";
-            if (currentFile) userDisplayText += ` (Image: ${currentFile.name})`;
-            if (systemContext) {
-                userDisplayText += `\n\n<span style="color: #81c995; font-size: 11px;">✓ Context applied: "${systemContext}"</span>`;
-            }
-            userBubble.innerHTML = userDisplayText;
 
             pairContainer.appendChild(userBubble);
             pairContainer.appendChild(aiBubble);
@@ -619,71 +712,94 @@
                 addLog("Previous session destroyed to free VRAM.");
             }
 
-            // API Options
-            let apiLanguage = languageSelect.value;
-            // Triche pour Chrome 150 : Si Français choisi, on déclare "Anglais" à l'API pour éviter le crash
-            if (apiLanguage === 'fr') {
-                apiLanguage = 'en';
-            }
-
             let options = {
                 temperature: parseFloat(temperatureInput.value),
                 topK: parseInt(topKInput.value),
-                signal: abortController.signal,
-                outputLanguage: apiLanguage
+                signal: abortController.signal
             };
 
-            if (currentFile) {
-                options.expectedInputs = [{ type: 'text' }, { type: 'image' }];
+            if (systemContext) {
+                options.systemPrompt = systemContext;
+                addLog("Context (System Prompt) injected into session options.");
             }
 
-            addLog(`Creating session (Lang forced to: ${apiLanguage}, Temp: ${options.temperature})...`);
+            if (currentFile) {
+                options.expectedInputs = [{ type: 'text' }, { type: attachmentType }];
+            }
+
+            addLog(`Creating session with Temp: ${options.temperature}, TopK: ${options.topK}`);
             aiSession = await aiApi.create(options);
 
-            // --- LE HACK DU MARTEAU (PROMPT ENGINEERING) ---
-            const uiLanguageName = languageSelect.options[languageSelect.selectedIndex].text.split(' ')[0];
+            // Extraction du nom de la langue depuis le texte de l'option (ex: "한국어" pour le Coréen)
+            const languageName = languageSelect.options[languageSelect.selectedIndex].text.split(' ')[0];
+
             let textWithSystemInstruction = rawText;
-
-            // On force le contexte au début
-            if (systemContext) {
-                textWithSystemInstruction = `[CRITICAL INSTRUCTION: ${systemContext}]\n\n` + textWithSystemInstruction;
-                addLog("Critical Context injected into prompt.");
+            if (systemContext && typeof options.systemPrompt === 'undefined') {
+                textWithSystemInstruction = `[CRITICAL INSTRUCTION: ${systemContext}]\n\nUser request: ${rawText}`;
             }
+            textWithSystemInstruction += `\n\n[Instruction for model: You must reply entirely in ${languageName}]`;
 
-            // On force la langue à la fin (Très important pour le Français)
-            textWithSystemInstruction += `\n\n[Instruction for model: You must reply entirely in ${uiLanguageName}]`;
+            let promptPayload = currentFile
+                ? [{ role: 'user', content: [{ type: 'text', value: textWithSystemInstruction }, { type: attachmentType, value: currentFile }] }]
+                : textWithSystemInstruction;
 
-            let promptPayload;
-            if (currentFile) {
-                promptPayload = [{
-                    role: 'user',
-                    content: [
-                        { type: 'text', value: textWithSystemInstruction },
-                        { type: 'image', value: currentFile }
-                    ]
-                }];
-                addLog("Sending multimodal payload...");
-            } else {
-                promptPayload = textWithSystemInstruction;
-                addLog("Sending text-only payload...");
-            }
-
-            // Execution Streaming
-            const stream = await aiSession.promptStreaming(promptPayload, { signal: abortController.signal });
+            const stream = await aiSession.promptStreaming(promptPayload);
             let fullResponse = '';
+
             aiBubble.innerHTML = '';
 
+            aiBubble.style.paddingBottom = "45px";
+            const ttsBtn = document.createElement('button');
+            ttsBtn.className = 'tts-btn';
+            ttsBtn.title = 'Read aloud';
+            ttsBtn.innerHTML = '🔈';
+            let ttsQueued = autoReadVoice.checked;
+
+            if (ttsQueued) {
+                ttsBtn.classList.add('playing');
+                ttsBtn.innerHTML = '🔊';
+            }
+
+            ttsBtn.addEventListener('click', () => {
+                if (window.speechSynthesis.speaking && ttsBtn.innerHTML === '🔊') {
+                    window.speechSynthesis.cancel();
+                    ttsBtn.classList.remove('playing');
+                    ttsBtn.innerHTML = '🔈';
+                    ttsQueued = false;
+                } else if (ttsBtn.innerHTML === '🔈') {
+                    ttsQueued = true;
+                    ttsBtn.classList.add('playing');
+                    ttsBtn.innerHTML = '🔊';
+
+                    if (executeBtn.disabled === false && fullResponse.length > 0) {
+                        playTTS(fullResponse, ttsBtn);
+                    }
+                } else {
+                    ttsQueued = false;
+                    ttsBtn.classList.remove('playing');
+                    ttsBtn.innerHTML = '🔈';
+                }
+            });
+
+            aiBubble.appendChild(ttsBtn);
+
             for await (const chunk of stream) {
+                if (abortController.signal.aborted) {
+                    throw new DOMException("Generation aborted by user", "AbortError");
+                }
+
                 fullResponse += chunk;
+
+                ttsBtn.remove();
 
                 if (enableCanvas.checked) {
                     aiBubble.innerHTML = marked.parse(fullResponse);
 
-                    // Canvas & Highlight.js
                     aiBubble.querySelectorAll('pre').forEach((pre) => {
                         const codeBlock = pre.querySelector('code');
-                        if (codeBlock && !pre.querySelector('.canvas-header')) {
+                        if (codeBlock) {
                             hljs.highlightElement(codeBlock);
+
                             const langClass = Array.from(codeBlock.classList).find(c => c.startsWith('language-'));
                             const langName = langClass ? langClass.replace('language-', '') : 'text';
 
@@ -699,19 +815,27 @@
                 } else {
                     aiBubble.textContent = fullResponse;
                 }
+
+                aiBubble.appendChild(ttsBtn);
             }
 
-            addLog("Execution completed successfully.", "success");
+            addLog("Execution completed successfully.");
+            clearUI();
+
+            if (ttsQueued) {
+                playTTS(fullResponse, ttsBtn);
+            }
 
         } catch (error) {
             if (error.name === 'AbortError') {
+                addLog("Execution manually aborted.", true);
                 if (conversationContainer.firstChild) {
                     const aiBubble = conversationContainer.firstChild.querySelector('.bubble-ai');
                     if (aiBubble) aiBubble.innerHTML += `<br><br><em style="color: #fca5a5;">[Generation stopped by user]</em>`;
                 }
             } else {
                 console.error("Execution error:", error);
-                addLog(`Execution failed: ${error.message}`, "error");
+                addLog(`Execution failed: ${error.message}`, true);
                 if (conversationContainer.firstChild) {
                     const aiBubble = conversationContainer.firstChild.querySelector('.bubble-ai');
                     if (aiBubble) aiBubble.innerHTML = `<strong>API Error:</strong> ${error.message}`;
@@ -720,10 +844,38 @@
         } finally {
             executeBtn.disabled = false;
             executeBtn.textContent = 'Execute';
-            cancelBtn.style.display = 'none'; // Cache le bouton Stop
-            abortController = null;
+            cancelBtn.style.display = 'none';
         }
     });
+
+    function playTTS(text, btnElement) {
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.cancel();
+        }
+
+        const cleanTextForSpeech = text.replace(/[*_`#]/g, '');
+        const utterance = new SpeechSynthesisUtterance(cleanTextForSpeech);
+
+        // Uses BCP-47 tag for correct pronunciation rules
+        utterance.lang = languageSelect.value;
+
+        utterance.onstart = () => {
+            btnElement.classList.add('playing');
+            btnElement.innerHTML = '🔊';
+        };
+
+        utterance.onend = () => {
+            btnElement.classList.remove('playing');
+            btnElement.innerHTML = '🔈';
+        };
+
+        utterance.onerror = () => {
+            btnElement.classList.remove('playing');
+            btnElement.innerHTML = '🔈';
+        };
+
+        window.speechSynthesis.speak(utterance);
+    }
 </script>
 </body>
 </html>
