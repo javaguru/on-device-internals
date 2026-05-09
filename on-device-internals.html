@@ -292,7 +292,7 @@
             align-self: flex-start;
             border-bottom-left-radius: 4px;
             width: 100%;
-            position: relative; /* Needed for TTS button positioning */
+            position: relative; /* Needed for TTS and Metrics positioning */
         }
 
         /* --- TEXT-TO-SPEECH BUTTON --- */
@@ -588,6 +588,25 @@
         return null;
     }
 
+    // Évaluation des performances du device
+    function getDevicePerformanceClass() {
+        // navigator.deviceMemory retourne la RAM en Go (souvent plafonnée à 8 pour des raisons de vie privée)
+        const ram = navigator.deviceMemory || 4;
+        // navigator.hardwareConcurrency retourne le nombre de cœurs logiques CPU
+        const cores = navigator.hardwareConcurrency || 4;
+
+        let score = 0;
+        if (ram >= 8) score += 2;
+        else if (ram >= 4) score += 1;
+
+        if (cores >= 12) score += 2;
+        else if (cores >= 8) score += 1;
+
+        if (score >= 4) return "High 🟢 (16GB+ RAM, 12+ Cores)";
+        if (score >= 2) return "Medium 🟡 (8GB+ RAM, 8+ Cores)";
+        return "Low 🔴 (<8GB RAM, <8 Cores)";
+    }
+
     // Initialisation et Status
     async function initModelStatus() {
         const statusBox = document.getElementById('modelStatusBox');
@@ -604,10 +623,15 @@
         try {
             const status = await aiApi.availability({ outputLanguage: "en-US" });
             addLog(`Model availability status: ${status}`);
+
+            const perfClass = getDevicePerformanceClass();
+            addLog(`Device performance estimated: ${perfClass.split(' ')[0]}`);
+
             statusBox.innerHTML = `
                     <p><strong>Model Status:</strong> <span style="color: #5eead4;">${status}</span></p>
                     <p><strong>API:</strong> window.ai.languageModel</p>
                     <p><strong>Hardware:</strong> On-Device WebGPU / WASM</p>
+                    <p><strong>Performance Class:</strong> ${perfClass}</p>
                 `;
         } catch(e) {
             addLog(`Error checking availability: ${e.message}`, true);
@@ -743,11 +767,18 @@
                 ? [{ role: 'user', content: [{ type: 'text', value: textWithSystemInstruction }, { type: attachmentType, value: currentFile }] }]
                 : textWithSystemInstruction;
 
+            // --- DEBUT DU CHRONOMETRE ET COMPTEURS ---
+            const startTime = performance.now();
+            let chunkCount = 0;
+            // Heuristique pour estimer les tokens d'entrée (texte)
+            const estimatedInputTokens = Math.ceil(textWithSystemInstruction.length / 4);
+
             const stream = await aiSession.promptStreaming(promptPayload);
             let fullResponse = '';
 
             aiBubble.innerHTML = '';
 
+            // Augmente l'espace en bas pour les futures métriques et le bouton audio
             aiBubble.style.paddingBottom = "45px";
             const ttsBtn = document.createElement('button');
             ttsBtn.className = 'tts-btn';
@@ -788,9 +819,10 @@
                     throw new DOMException("Generation aborted by user", "AbortError");
                 }
 
+                chunkCount++; // Incrémentation du nombre de morceaux reçus
                 fullResponse += chunk;
 
-                ttsBtn.remove();
+                ttsBtn.remove(); // On l'enlève temporairement pendant le parse Markdown
 
                 if (enableCanvas.checked) {
                     aiBubble.innerHTML = marked.parse(fullResponse);
@@ -816,10 +848,23 @@
                     aiBubble.textContent = fullResponse;
                 }
 
-                aiBubble.appendChild(ttsBtn);
+                aiBubble.appendChild(ttsBtn); // On le remet à sa place
             }
 
-            addLog("Execution completed successfully.");
+            // --- FIN DU CHRONOMETRE ET CALCULS ---
+            const endTime = performance.now();
+            const durationSec = (endTime - startTime) / 1000;
+            const estimatedOutputTokens = Math.ceil(fullResponse.length / 4);
+            const tps = (estimatedOutputTokens / durationSec).toFixed(1);
+
+            // Ajout des métriques à l'interface
+            const metricsDiv = document.createElement('div');
+            // Ajout de white-space: nowrap pour garantir l'affichage sur une seule ligne
+            metricsDiv.style.cssText = "position: absolute; bottom: 15px; right: 55px; font-size: 11px; font-family: Consolas, monospace; opacity: 0.7; white-space: nowrap;";
+            metricsDiv.innerHTML = `⏱️ <em style="color: #0059ff;">${durationSec.toFixed(2)}s &nbsp;|&nbsp; 📥 In: ~${estimatedInputTokens} &nbsp;|&nbsp; 📤 Out: ~${estimatedOutputTokens} &nbsp;|&nbsp; 🧩 Chunks: ${chunkCount} &nbsp;|&nbsp; ⚡ ~${tps} TPS</em>`;
+            aiBubble.appendChild(metricsDiv);
+
+            addLog(`Execution completed in ${durationSec.toFixed(2)}s (~${tps} TPS). Input: ~${estimatedInputTokens}, Output: ~${estimatedOutputTokens}, Chunks: ${chunkCount}`);
             clearUI();
 
             if (ttsQueued) {
@@ -831,7 +876,7 @@
                 addLog("Execution manually aborted.", true);
                 if (conversationContainer.firstChild) {
                     const aiBubble = conversationContainer.firstChild.querySelector('.bubble-ai');
-                    if (aiBubble) aiBubble.innerHTML += `<br><br><em style="color: #fca5a5;">[Generation stopped by user]</em>`;
+                    if (aiBubble) aiBubble.innerHTML += `<br><br><em style="color: #ff0000;">[Generation stopped by user]</em>`;
                 }
             } else {
                 console.error("Execution error:", error);
