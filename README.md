@@ -8,7 +8,7 @@ Built as a lightweight, vanilla front-end alternative to the native `chrome://on
 
 ## **Hardware Requirements**
 
-Since Gemini Nano runs entirely on-device, your system must meet specific hardware criteria to handle the model weights and token generation smoothly:
+Since Gemini Nano (v3Nano) runs entirely on-device, your system must meet specific hardware criteria to handle the model weights and token generation smoothly:
 
 * **GPU:** DirectX 12 / Vulkan / Metal compatible GPU (WebGPU support required).
     * *Minimum:* NVIDIA GTX 1050, AMD Radeon RX 460, or modern Integrated Graphics (e.g., Intel Iris Xe, Apple M1).
@@ -20,8 +20,6 @@ Since Gemini Nano runs entirely on-device, your system must meet specific hardwa
 
 This tool addresses several inconsistencies and limitations currently present in the W3C Web Incubator experimental Prompt API:
 
-* **VRAM Management & Force Kill (AbortController):**  
-  Streaming local LLMs can cause UI freezes or memory leaks if unmanaged. This implementation binds an AbortController to the promptStreaming() method. Triggering the "Stop" action not only aborts the signal but explicitly calls session.destroy() to flush the VRAM and forcefully terminate the worker thread.
 * **Chrome 150+ Language Bypass & Universal Translation:**  
   Recent Chrome builds strictly validate the outputLanguage flag and usually only accept English, Spanish, or Japanese. This tool cleverly bypasses this WebIDL validation\! It spoofs the initial session as en-US but uses prompt engineering at the end of the payload to force the output into your preferred language. Supports 13+ languages including Korean, Russian, Arabic, and Hindi.
 * **"Hammer Method" System Prompt Injection:**  
@@ -34,6 +32,8 @@ This tool addresses several inconsistencies and limitations currently present in
   Leverages the browser's native window.speechSynthesis API for an 'Auto-Read Voice' feature. The TTS engine strips away markdown artifacts before reading and automatically adapts its pronunciation to your selected BCP-47 language tag—no external cloud APIs required\!
 * **Dev-Friendly Key Bindings:**  
   Optimized input area where Enter instantly triggers the execution payload, while Shift \+ Enter or Ctrl/Cmd \+ Enter safely insert line breaks.
+* **VRAM Management & Force Kill (AbortController):**  
+  Streaming local LLMs can cause UI freezes or memory leaks if unmanaged. This implementation binds an AbortController to the promptStreaming() method. Triggering the "Stop" action not only aborts the signal but explicitly calls session.destroy() to flush the VRAM and forcefully terminate the worker thread.
 
 ## **Prerequisites & Chrome Setup**
 
