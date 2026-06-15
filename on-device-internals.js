@@ -67,7 +67,7 @@ function addLog(msg, isError = false) {
 function getAiApi() {
     try {
         if (typeof LanguageModel !== 'undefined') return LanguageModel;
-        if (window.ai && window.ai.languageModel) return window.ai.languageModel;
+        if ('ai' in window && 'languageModel' in window.ai) return window.ai.languageModel;
     } catch (e) {
         console.warn("API not found:", e);
     }
@@ -204,7 +204,12 @@ executeBtn.addEventListener('click', async () => {
 
         const aiBubble = document.createElement('div');
         aiBubble.className = 'bubble bubble-ai';
-        aiBubble.innerHTML = '<em>Thinking...</em>';
+
+        const aiContent = document.createElement('div');
+        aiContent.className = 'ai-content';
+        aiContent.innerHTML = '<em>Thinking...</em>';
+
+        aiBubble.appendChild(aiContent);
 
         pairContainer.appendChild(userBubble);
         pairContainer.appendChild(aiBubble);
@@ -254,7 +259,7 @@ executeBtn.addEventListener('click', async () => {
         const stream = await aiSession.promptStreaming(promptPayload);
         let fullResponse = '';
 
-        aiBubble.innerHTML = '';
+        aiContent.innerHTML = '';
 
         aiBubble.style.paddingBottom = "45px";
         const ttsBtn = document.createElement('button');
@@ -299,12 +304,10 @@ executeBtn.addEventListener('click', async () => {
             chunkCount++;
             fullResponse += chunk;
 
-            ttsBtn.remove();
-
             if (enableCanvas.checked) {
-                aiBubble.innerHTML = marked.parse(fullResponse);
+                aiContent.innerHTML = DOMPurify.sanitize(marked.parse(fullResponse));
 
-                aiBubble.querySelectorAll('pre').forEach((pre) => {
+                aiContent.querySelectorAll('pre').forEach((pre) => {
                     const codeBlock = pre.querySelector('code');
                     if (codeBlock) {
                         hljs.highlightElement(codeBlock);
@@ -322,10 +325,8 @@ executeBtn.addEventListener('click', async () => {
                     }
                 });
             } else {
-                aiBubble.textContent = fullResponse;
+                aiContent.textContent = fullResponse;
             }
-
-            aiBubble.appendChild(ttsBtn);
         }
 
         const endTime = performance.now();
@@ -349,15 +350,15 @@ executeBtn.addEventListener('click', async () => {
         if (error.name === 'AbortError') {
             addLog("Execution manually aborted.", true);
             if (conversationContainer.firstChild) {
-                const aiBubble = conversationContainer.firstChild.querySelector('.bubble-ai');
-                if (aiBubble) aiBubble.innerHTML += `<br><br><em style="color: #ff0000;">[Generation stopped by user]</em>`;
+                const contentNode = conversationContainer.firstChild.querySelector('.ai-content');
+                if (contentNode) contentNode.innerHTML += `<br><br><em style="color: #ff0000;">[Generation stopped by user]</em>`;
             }
         } else {
             console.error("Execution error:", error);
             addLog(`Execution failed: ${error.message}`, true);
             if (conversationContainer.firstChild) {
-                const aiBubble = conversationContainer.firstChild.querySelector('.bubble-ai');
-                if (aiBubble) aiBubble.innerHTML = `<strong>API Error:</strong> ${error.message}`;
+                const contentNode = conversationContainer.firstChild.querySelector('.ai-content');
+                if (contentNode) contentNode.innerHTML = `<strong>API Error:</strong> ${error.message}`;
             }
         }
     } finally {
